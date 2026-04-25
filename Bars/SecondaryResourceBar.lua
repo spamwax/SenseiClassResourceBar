@@ -2,7 +2,6 @@ local _, addonTable = ...
 
 local LEM = addonTable.LEM or LibStub("LibEQOLEditMode-1.0")
 local L = addonTable.L
-local HOLY_POWER_MAX = UnitPowerMax("player", Enum.PowerType.HolyPower)
 
 local SecondaryResourceBarMixin = Mixin({}, addonTable.PowerBarMixin)
 
@@ -23,7 +22,8 @@ function SecondaryResourceBarMixin:GetBarColor(resource)
 
     -- Check if Holy Power is capped
     local current = UnitPower("player", Enum.PowerType.HolyPower)
-    if current >= HOLY_POWER_MAX then
+    local max = UnitPowerMax("player", Enum.PowerType.HolyPower)
+    if max > 0 and current >= max then
         return { r = 1, g = 0, b = 0, a = color.a or 1 }
     end
 
@@ -225,7 +225,7 @@ function SecondaryResourceBarMixin:GetResourceValue(resource)
 
     if resource == Enum.PowerType.HolyPower then
         -- Check if Holy Power is capped
-        local isHolyPowerCapped = current >= HOLY_POWER_MAX
+        local isHolyPowerCapped = current >= max
         if self._isHolyPowerCapped ~= isHolyPowerCapped then
             self._isHolyPowerCapped = isHolyPowerCapped
             self:ApplyForegroundSettings()
