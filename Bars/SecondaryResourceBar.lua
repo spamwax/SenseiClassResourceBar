@@ -2,8 +2,33 @@ local _, addonTable = ...
 
 local LEM = addonTable.LEM or LibStub("LibEQOLEditMode-1.0")
 local L = addonTable.L
+local HOLY_POWER_MAX = UnitPowerMax("player", Enum.PowerType.HolyPower)
 
 local SecondaryResourceBarMixin = Mixin({}, addonTable.PowerBarMixin)
+
+function SecondaryResourceBarMixin:GetCachedSpecID()
+    if not self._cachedSpecID then
+        local spec = C_SpecializationInfo.GetSpecialization()
+        self._cachedSpecID = C_SpecializationInfo.GetSpecializationInfo(spec) or 0
+    end
+    return self._cachedSpecID
+end
+
+function SecondaryResourceBarMixin:GetBarColor(resource)
+    local color = addonTable.PowerBarMixin.GetBarColor(self, resource)
+
+    if resource ~= Enum.PowerType.HolyPower then
+        return color
+    end
+
+    -- Check if Holy Power is capped
+    local current = UnitPower("player", Enum.PowerType.HolyPower)
+    if current >= HOLY_POWER_MAX then
+        return { r = 1, g = 0, b = 0, a = color.a or 1 }
+    end
+
+    return color
+end
 
 function SecondaryResourceBarMixin:OnLoad()
     addonTable.PowerBarMixin.OnLoad(self)
@@ -14,6 +39,11 @@ end
 
 function SecondaryResourceBarMixin:OnEvent(event, ...)
     addonTable.PowerBarMixin.OnEvent(self, event, ...)
+
+    -- Clear cached spec ID on specialization change
+    if event == "PLAYER_SPECIALIZATION_CHANGED" then
+        self._cachedSpecID = nil
+    end
 
     -- Modules for the special cases requiring more work
     addonTable.Whirlwind:OnEvent(self, event, ...)
@@ -62,8 +92,7 @@ function SecondaryResourceBarMixin:GetResource()
         },
     }
 
-    local spec = C_SpecializationInfo.GetSpecialization()
-    local specID = C_SpecializationInfo.GetSpecializationInfo(spec)
+    local specID = self:GetCachedSpecID()
 
     local resource = self._resourceTable[playerClass]
 
@@ -149,8 +178,7 @@ function SecondaryResourceBarMixin:GetResourceValue(resource)
     end
 
     if resource == Enum.PowerType.SoulShards then
-        local spec = C_SpecializationInfo.GetSpecialization()
-        local specID = C_SpecializationInfo.GetSpecializationInfo(spec)
+        local specID = self:GetCachedSpecID()
 
         -- If true, current and max will be something like 14 for 1.4 shard, instead of 1
         local preciseResourceCount = specID == 267
@@ -195,6 +223,17 @@ function SecondaryResourceBarMixin:GetResourceValue(resource)
     local max = UnitPowerMax("player", resource)
     if max <= 0 then return nil, nil end
 
+    if resource == Enum.PowerType.HolyPower then
+        -- Check if Holy Power is capped
+        local isHolyPowerCapped = current >= HOLY_POWER_MAX
+        if self._isHolyPowerCapped ~= isHolyPowerCapped then
+            self._isHolyPowerCapped = isHolyPowerCapped
+            self:ApplyForegroundSettings()
+        end
+    else
+        self._isHolyPowerCapped = nil
+    end
+
     return max, current
 end
 
@@ -213,8 +252,7 @@ function SecondaryResourceBarMixin:GetTagValues(resource, max, current, precisio
     end
 
     if resource == Enum.PowerType.SoulShards then
-        local spec = C_SpecializationInfo.GetSpecialization()
-        local specID = C_SpecializationInfo.GetSpecializationInfo(spec)
+        local specID = self:GetCachedSpecID()
 
         if specID == 267 then
             current = current / 10
